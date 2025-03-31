@@ -11,7 +11,7 @@ async function main() {
         const db = client.db("testDB");
         const collection = db.collection("users");
 
-        const result = await collection.insertOne({ name: "John Doe", age: 25 });
+        const result = await collection.insertOne({ name: "Faiz", age: 21 });
         console.log(`Inserted document with _id: ${result.insertedId}`);
     } catch (error) {
         console.error(error);
