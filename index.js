@@ -23,7 +23,7 @@ async function run() {
 
         // Insert drivers into the collection
         const insertResults = await driversCollection.insertMany(drivers);
-        console.log(`🚗 Inserted ${insertResults.insertedCount} drivers`);
+        console.log(` Inserted ${insertResults.insertedCount} drivers`);
 
         // Find all available drivers with rating ≥ 4.5
         const highRatedDrivers = await driversCollection.find({
