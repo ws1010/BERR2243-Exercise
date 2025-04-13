@@ -1,0 +1,35 @@
+{
+	"info": {
+		"_postman_id": "d9c4ca80-c884-4953-bf54-0a32a3f62761",
+		"name": "New Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43991385",
+		"_collection_link": "https://liewwensheng.postman.co/workspace/My-Workspace~a62a921c-1754-4817-885c-4e9ba40b4bf0/collection/43991385-d9c4ca80-c884-4953-bf54-0a32a3f62761?action=share&source=collection_link&creator=43991385"
+	},
+	"item": [
+		{
+			"name": "Week03 exercise",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": ""
+				},
+				"description": "exercise 3"
+			},
+			"response": []
+		}
+	]
+}

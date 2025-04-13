@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ride Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f2f5;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+    input, select {
+      padding: 8px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 8px 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .form-section {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ride Management Dashboard</h1>
+
+  <div class="form-section">
+    <h3>Add New Ride</h3>
+    <input type="text" id="pickup" placeholder="Pickup Location" />
+    <input type="text" id="destination" placeholder="Destination" />
+    <input type="text" id="driver" placeholder="Driver Name" />
+    <button onclick="addRide()">Add Ride</button>
+  </div>
+
+  <div class="form-section">
+    <h3>Update Ride Status</h3>
+    <input type="text" id="rideId" placeholder="Ride ID" />
+    <select id="status">
+      <option value="pending">Pending</option>
+      <option value="completed">Completed</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <button onclick="updateRide()">Update Status</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Pickup</th>
+        <th>Destination</th>
+        <th>Driver</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="ridesTable"></tbody>
+  </table>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/rides';
+
+    async function fetchRides() {
+      const res = await fetch(API_BASE);
+      const rides = await res.json();
+      const table = document.getElementById('ridesTable');
+      table.innerHTML = '';
+
+      rides.forEach(ride => {
+        table.innerHTML += `
+          <tr>
+            <td>${ride._id}</td>
+            <td>${ride.pickup || ''}</td>
+            <td>${ride.destination || ''}</td>
+            <td>${ride.driver || ''}</td>
+            <td>${ride.status || 'pending'}</td>
+            <td><button onclick="deleteRide('${ride._id}')">Delete</button></td>
+          </tr>
+        `;
+      });
+    }
+
+    async function addRide() {
+      const pickup = document.getElementById('pickup').value;
+      const destination = document.getElementById('destination').value;
+      const driver = document.getElementById('driver').value;
+
+      const res = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pickup, destination, driver, status: 'pending' }),
+      });
+
+      if (res.ok) {
+        alert('Ride added successfully!');
+        fetchRides();
+      } else {
+        alert('Failed to add ride');
+      }
+    }
+
+    async function updateRide() {
+      const id = document.getElementById('rideId').value;
+      const status = document.getElementById('status').value;
+
+      const res = await fetch(`${API_BASE}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (res.ok) {
+        alert('Status updated!');
+        fetchRides();
+      } else {
+        alert('Failed to update ride');
+      }
+    }
+
+    async function deleteRide(id) {
+      if (confirm('Are you sure you want to delete this ride?')) {
+        const res = await fetch(`${API_BASE}/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (res.ok) {
+          alert('Ride deleted');
+          fetchRides();
+        } else {
+          alert('Failed to delete');
+        }
+      }
+    }
+
+    // Load rides on page load
+    fetchRides();
+  </script>
+</body>
+</html>

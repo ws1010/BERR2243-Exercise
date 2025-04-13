@@ -1,8 +1,12 @@
 const express = require('express');
+const cors = require('cors'); 
 const { MongoClient, ObjectId } = require('mongodb'); 
 const port = 3000;
 
 const app = express();
+
+app.use(cors());
+
 app.use(express.json());
 
 let db;
@@ -25,7 +29,6 @@ connectToMongoDB();
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
-
 
 // --- RIDE ENDPOINTS ---
 

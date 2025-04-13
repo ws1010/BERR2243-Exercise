@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/ws1010/BERR2243-Exercise#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^5.1.0",
     "mongodb": "^6.15.0"
   }
