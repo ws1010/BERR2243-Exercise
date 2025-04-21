@@ -13,3 +13,5 @@ end_time = time.time()  # End timer
 
 duration = (end_time - start_time) * 1000  # Convert to milliseconds
 print(f"Connection Time: {duration:.2f} ms")
+
+

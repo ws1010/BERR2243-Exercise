@@ -1,89 +1,82 @@
 const express = require('express');
-const cors = require('cors'); 
-const { MongoClient, ObjectId } = require('mongodb'); 
-const port = 3000;
-
+const { MongoClient, ObjectId } = require('mongodb');
 const app = express();
-
-app.use(cors());
+const port = 3000;
 
 app.use(express.json());
 
+const uri = "mongodb://localhost:27017";
+const client = new MongoClient(uri);
 let db;
 
+// Connect to MongoDB
 async function connectToMongoDB() {
-  const uri = "mongodb://localhost:27017";
-  const client = new MongoClient(uri);
-
   try {
     await client.connect();
-    console.log("Connected to MongoDB!");
-
-    db = client.db("testDB");
-  } catch (err) {
-    console.error("Error:", err);
+    db = client.db("rideHailingDB");
+    console.log("Connected to MongoDB");
+  } catch (error) {
+    console.error("MongoDB connection failed:", error);
   }
 }
 connectToMongoDB();
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Customer Registration
+app.post('/users', async (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) return res.status(400).send("Missing fields");
+
+  try {
+    const result = await db.collection("users").insertOne({ name, email, password, role: 'customer' });
+    res.status(201).send(result);
+  } catch (error) {
+    res.status(500).send("Error creating user");
+  }
 });
 
-// --- RIDE ENDPOINTS ---
+// Customer Login
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await db.collection("users").findOne({ email, password });
+    if (user) res.status(200).send("Login successful");
+    else res.status(401).send("Unauthorized");
+  } catch (error) {
+    res.status(500).send("Login error");
+  }
+});
 
-// GET /rides – Fetch All Rides
-app.get('/rides', async (req, res) => {
-    try {
-      const rides = await db.collection('rides').find().toArray();
-      res.json(rides);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch rides' });
-    }
-  });
-  
-  // POST /rides – Create a new ride
-app.post('/rides', async (req, res) => {
-    try {
-      const result = await db.collection('rides').insertOne(req.body);
-      res.status(201).json({ id: result.insertedId });
-    } catch (err) {
-      res.status(400).json({ error: "Invalid ride data" });
-    }
-  });
-  
-  // PATCH /rides/:id – Update ride status
-  app.patch('/rides/:id', async (req, res) => {
-    try {
-      const result = await db.collection('rides').updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: { status: req.body.status } }
-      );
-  
-      if (result.modifiedCount === 0) {
-        return res.status(404).json({ error: "Ride not found" });
-      }
-  
-      res.status(200).json({ updated: result.modifiedCount });
-    } catch (err) {
-      // Handle invalid ID format or DB errors
-      res.status(400).json({ error: "Invalid ride ID or data" });
-    }
-  });
-  
-  // DELETE /rides/:id – Cancel a ride
-  app.delete('/rides/:id', async (req, res) => {
-    try {
-      const result = await db.collection('rides').deleteOne({
-        _id: new ObjectId(req.params.id)
-      });
-  
-      if (result.deletedCount === 0) {
-        return res.status(404).json({ error: "Ride not found" });
-      }
-  
-      res.status(200).json({ deleted: result.deletedCount });
-    } catch (err) {
-      res.status(400).json({ error: "Invalid ride ID" });
-    }
-  });
+// Update Driver Status
+app.patch('/drivers/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const result = await db.collection("drivers").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status } }
+    );
+
+    if (result.matchedCount === 0) return res.status(404).send("Driver not found");
+    res.status(200).send("Status updated");
+  } catch (error) {
+    res.status(500).send("Error updating status");
+  }
+});
+
+// Block User (Admin)
+app.delete('/admin/users/:id', async (req, res) => {
+  const { id } = req.params;
+  // You can add an admin check here
+  try {
+    const result = await db.collection("users").deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) return res.status(403).send("User not found or forbidden");
+    res.status(204).send(); // No content
+  } catch (error) {
+    res.status(500).send("Error deleting user");
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
