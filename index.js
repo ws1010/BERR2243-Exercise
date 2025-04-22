@@ -1,82 +1,115 @@
 const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const app = express();
+const cors = require('cors'); 
+const { MongoClient, ObjectId } = require('mongodb'); 
 const port = 3000;
+
+const app = express();
+
+app.use(cors());
 
 app.use(express.json());
 
-const uri = "mongodb://localhost:27017";
-const client = new MongoClient(uri);
 let db;
 
-// Connect to MongoDB
 async function connectToMongoDB() {
+  const uri = "mongodb://localhost:27017";
+  const client = new MongoClient(uri);
+
   try {
     await client.connect();
-    db = client.db("rideHailingDB");
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    console.error("MongoDB connection failed:", error);
+    console.log("Connected to MongoDB!");
+
+    db = client.db("testDB");
+  } catch (err) {
+    console.error("Error:", err);
   }
 }
 connectToMongoDB();
 
-// Customer Registration
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+//
+// 🚗 POST - Register (Passenger)
+//
 app.post('/users', async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).send("Missing fields");
+  const { name, email, role, phone } = req.body;
+  if (!name || !email || !role || !phone) return res.status(400).send("Missing fields");
 
-  try {
-    const result = await db.collection("users").insertOne({ name, email, password, role: 'customer' });
-    res.status(201).send(result);
-  } catch (error) {
-    res.status(500).send("Error creating user");
-  }
+  const result = await db.collection('users').insertOne({ name, email, role, phone });
+  res.status(201).json(result);
 });
 
-// Customer Login
+//
+// 🔐 POST - Login (Any role)
+//
 app.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await db.collection("users").findOne({ email, password });
-    if (user) res.status(200).send("Login successful");
-    else res.status(401).send("Unauthorized");
-  } catch (error) {
-    res.status(500).send("Login error");
-  }
+  const { email } = req.body;
+  const user = await db.collection('users').findOne({ email });
+  if (user) res.status(200).json(user);
+  else res.status(401).send("Unauthorized");
 });
 
-// Update Driver Status
-app.patch('/drivers/:id/status', async (req, res) => {
+//
+// 📥 POST - Book Ride (Passenger)
+//
+app.post('/rides', async (req, res) => {
+  const { passengerId, destination } = req.body;
+  if (!passengerId || !destination) return res.status(400).send("Missing info");
+  const ride = await db.collection('rides').insertOne({ passengerId, destination, status: 'pending' });
+  res.status(201).json(ride);
+});
+
+//
+// 📤 POST - Set Driver Availability
+//
+app.post('/drivers/:id/availability', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
-
-  try {
-    const result = await db.collection("drivers").updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { status } }
-    );
-
-    if (result.matchedCount === 0) return res.status(404).send("Driver not found");
-    res.status(200).send("Status updated");
-  } catch (error) {
-    res.status(500).send("Error updating status");
-  }
+  const { available } = req.body;
+  await db.collection('users').updateOne(
+    { _id: new ObjectId(id), role: 'driver' },
+    { $set: { available } }
+  );
+  res.status(200).send("Driver availability updated");
 });
 
-// Block User (Admin)
+//
+// 🧾 GET - View Ride History (Passenger)
+//
+app.get('/rides/:passengerId/history', async (req, res) => {
+  const rides = await db.collection('rides').find({ passengerId: req.params.passengerId }).toArray();
+  res.status(200).json(rides);
+});
+
+//
+// 📋 GET - View All Users (Admin)
+//
+app.get('/admin/users', async (req, res) => {
+  const users = await db.collection('users').find().toArray();
+  res.status(200).json(users);
+});
+
+//
+// ✅ PATCH - Accept Ride (Driver)
+//
+app.patch('/rides/:rideId/accept', async (req, res) => {
+  const { rideId } = req.params;
+  const { driverId } = req.body;
+
+  await db.collection('rides').updateOne(
+    { _id: new ObjectId(rideId) },
+    { $set: { status: 'accepted', driverId } }
+  );
+
+  res.status(200).send("Ride accepted");
+});
+
+//
+// 🔒 DELETE - Block User (Admin)
+//
 app.delete('/admin/users/:id', async (req, res) => {
   const { id } = req.params;
-  // You can add an admin check here
-  try {
-    const result = await db.collection("users").deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) return res.status(403).send("User not found or forbidden");
-    res.status(204).send(); // No content
-  } catch (error) {
-    res.status(500).send("Error deleting user");
-  }
+  await db.collection('users').deleteOne({ _id: new ObjectId(id) });
+  res.status(204).send();
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
