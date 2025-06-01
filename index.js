@@ -1,115 +1,83 @@
+// Load environment variables
+require('dotenv').config();
+const { authenticate, authorize } = require('./middleware/auth');
+
+
+// Import required modules
 const express = require('express');
-const cors = require('cors'); 
-const { MongoClient, ObjectId } = require('mongodb'); 
-const port = 3000;
-
 const app = express();
+const { MongoClient } = require('mongodb');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
-app.use(cors());
-
+// Middleware to parse JSON
 app.use(express.json());
 
+// MongoDB connection setup
+const client = new MongoClient('mongodb://localhost:27017');
 let db;
 
-async function connectToMongoDB() {
-  const uri = "mongodb://localhost:27017";
-  const client = new MongoClient(uri);
+client.connect().then(() => {
+  db = client.db('e-hailing'); // or your actual DB name
+  console.log("Connected to MongoDB");
+});
+
+// Registration route
+const saltRounds = 10;
+app.post('/users', async (req, res) => {
+  const { name, email, password, role } = req.body;
+
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
 
   try {
-    await client.connect();
-    console.log("Connected to MongoDB!");
+    const existingUser = await db.collection('users').findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
 
-    db = client.db("testDB");
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const user = { name, email, password: hashedPassword, role };
+    await db.collection('users').insertOne(user);
+
+    res.status(201).json({ message: "User created successfully" });
   } catch (err) {
-    console.error("Error:", err);
+    console.error(err);
+    res.status(500).json({ error: "Registration failed" });
   }
-}
-connectToMongoDB();
-
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
-//
-// 🚗 POST - Register (Passenger)
-//
-app.post('/users', async (req, res) => {
-  const { name, email, role, phone } = req.body;
-  if (!name || !email || !role || !phone) return res.status(400).send("Missing fields");
-
-  const result = await db.collection('users').insertOne({ name, email, role, phone });
-  res.status(201).json(result);
 });
 
-//
-// 🔐 POST - Login (Any role)
-//
+// Login route
 app.post('/auth/login', async (req, res) => {
-  const { email } = req.body;
-  const user = await db.collection('users').findOne({ email });
-  if (user) res.status(200).json(user);
-  else res.status(401).send("Unauthorized");
+  try {
+    const user = await db.collection('users').findOne({ email: req.body.email });
+
+    if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.status(200).json({ token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Login failed" });
+  }
 });
 
-//
-// 📥 POST - Book Ride (Passenger)
-//
-app.post('/rides', async (req, res) => {
-  const { passengerId, destination } = req.body;
-  if (!passengerId || !destination) return res.status(400).send("Missing info");
-  const ride = await db.collection('rides').insertOne({ passengerId, destination, status: 'pending' });
-  res.status(201).json(ride);
+
+
+// Start server
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
 });
 
-//
-// 📤 POST - Set Driver Availability
-//
-app.post('/drivers/:id/availability', async (req, res) => {
-  const { id } = req.params;
-  const { available } = req.body;
-  await db.collection('users').updateOne(
-    { _id: new ObjectId(id), role: 'driver' },
-    { $set: { available } }
-  );
-  res.status(200).send("Driver availability updated");
+app.delete('/admin/users/:id', authenticate, authorize(['admin']), async (req, res) => {
+  console.log("admin only"); // for debugging
+  res.status(200).send("admin access");
 });
-
-//
-// 🧾 GET - View Ride History (Passenger)
-//
-app.get('/rides/:passengerId/history', async (req, res) => {
-  const rides = await db.collection('rides').find({ passengerId: req.params.passengerId }).toArray();
-  res.status(200).json(rides);
-});
-
-//
-// 📋 GET - View All Users (Admin)
-//
-app.get('/admin/users', async (req, res) => {
-  const users = await db.collection('users').find().toArray();
-  res.status(200).json(users);
-});
-
-//
-// ✅ PATCH - Accept Ride (Driver)
-//
-app.patch('/rides/:rideId/accept', async (req, res) => {
-  const { rideId } = req.params;
-  const { driverId } = req.body;
-
-  await db.collection('rides').updateOne(
-    { _id: new ObjectId(rideId) },
-    { $set: { status: 'accepted', driverId } }
-  );
-
-  res.status(200).send("Ride accepted");
-});
-
-//
-// 🔒 DELETE - Block User (Admin)
-//
-app.delete('/admin/users/:id', async (req, res) => {
-  const { id } = req.params;
-  await db.collection('users').deleteOne({ _id: new ObjectId(id) });
-  res.status(204).send();
-});
-
